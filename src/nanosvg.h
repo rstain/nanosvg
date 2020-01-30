@@ -253,7 +253,7 @@ static void nsvg__parseContent(char* s,
 }
 
 static void nsvg__parseElement(char* s,
-							   void (*startelCb)(void* ud, const char* el, const char** attr),
+							   void (*startelCb)(void* ud, const char* el, const char** /*attr*/),
 							   void (*endelCb)(void* ud, const char* el),
 							   void* ud)
 {
@@ -329,7 +329,7 @@ static void nsvg__parseElement(char* s,
 }
 
 int nsvg__parseXML(char* input,
-				   void (*startelCb)(void* ud, const char* el, const char** attr),
+				   void (*startelCb)(void* ud, const char* el, const char** /*attr*/),
 				   void (*endelCb)(void* ud, const char* el),
 				   void (*contentCb)(void* ud, const char* s),
 				   void* ud)
