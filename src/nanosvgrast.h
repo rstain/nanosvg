@@ -1389,7 +1389,28 @@ void nsvgRasterize(NSVGrasterizer* r,
 		if (!(shape->flags & NSVG_FLAGS_VISIBLE))
 			continue;
 
-		if (shape->fill.type != NSVG_PAINT_NONE) {
+		// To paint fill, stroke and markers in the specified order
+		// we do cycle of 3 passes. On each pass we paint an entity
+		// according to an EntityOrder structure, where
+		// index is a pass number, values are: 0 - fill, 1 - stroke, 2 - markers
+		struct EntityOrder
+		{
+			int entity[3];
+		};
+		EntityOrder entOrders[] =
+		{
+			{ 0, 1, 2 }, // NSVG_PAINT_ORDER_FILL_STROKE_MARKERS
+			{ 1, 0, 2 }, // NSVG_PAINT_ORDER_STROKE_FILL_MARKERS
+			{ 0, 2, 1 }, // NSVG_PAINT_ORDER_FILL_MARKERS_STROKE
+			{ 2, 0, 1 }, // NSVG_PAINT_ORDER_MARKERS_FILL_STROKE
+			{ 1, 2, 0 }, // NSVG_PAINT_ORDER_STROKE_MARKERS_FILL
+			{ 2, 1, 0 }, // NSVG_PAINT_ORDER_MARKERS_STROKE_FILL
+		};
+
+		const EntityOrder* order = entOrders + shape->paintOrder;
+
+		for (int pass = 0; pass < 3; pass++) {
+			if (order->entity[pass] == 0 && shape->fill.type != NSVG_PAINT_NONE) {
 			nsvg__resetPool(r);
 			r->freelist = NULL;
 			r->nedges = 0;
@@ -1413,7 +1434,7 @@ void nsvgRasterize(NSVGrasterizer* r,
 
 			nsvg__rasterizeSortedEdges(r, tx,ty,scale, &cache, shape->fillRule);
 		}
-		if (shape->stroke.type != NSVG_PAINT_NONE && (shape->strokeWidth * scale) > 0.01f) {
+			if (order->entity[pass] == 1 && shape->stroke.type != NSVG_PAINT_NONE && (shape->strokeWidth * scale) > 0.01f) {
 			nsvg__resetPool(r);
 			r->freelist = NULL;
 			r->nedges = 0;
@@ -1438,6 +1459,7 @@ void nsvgRasterize(NSVGrasterizer* r,
 			nsvg__initPaint(&cache, &shape->stroke, shape->opacity);
 
 			nsvg__rasterizeSortedEdges(r, tx,ty,scale, &cache, NSVG_FILLRULE_NONZERO);
+			}
 		}
 	}
 

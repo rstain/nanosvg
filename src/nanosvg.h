@@ -78,6 +78,15 @@ enum NSVGpaintType {
 	NSVG_PAINT_RADIAL_GRADIENT = 3
 };
 
+enum NSVGpaintOrder {
+	NSVG_PAINT_ORDER_FILL_STROKE_MARKERS = 0,
+	NSVG_PAINT_ORDER_STROKE_FILL_MARKERS = 1,
+	NSVG_PAINT_ORDER_FILL_MARKERS_STROKE = 2,
+	NSVG_PAINT_ORDER_MARKERS_FILL_STROKE = 3,
+	NSVG_PAINT_ORDER_STROKE_MARKERS_FILL = 4,
+	NSVG_PAINT_ORDER_MARKERS_STROKE_FILL = 5,
+};
+
 enum NSVGspreadType {
 	NSVG_SPREAD_PAD = 0,
 	NSVG_SPREAD_REFLECT = 1,
@@ -138,6 +147,8 @@ typedef struct NSVGpath
 typedef struct NSVGshape
 {
 	char id[64];				// Optional 'id' attr of the shape or its group
+
+	NSVGpaintOrder paintOrder;	// Order of painting of fill, stroke, markers
 	NSVGpaint fill;				// Fill paint
 	NSVGpaint stroke;			// Stroke paint
 	float opacity;				// Opacity of the shape.
@@ -422,6 +433,7 @@ typedef struct NSVGattrib
 {
 	char id[64];
 	float xform[6];
+	NSVGpaintOrder paintOrder;
 	unsigned int fillColor;
 	unsigned int strokeColor;
 	float opacity;
@@ -978,6 +990,7 @@ static void nsvg__addShape(NSVGparser* p)
 
 	memcpy(shape->id, attr->id, sizeof shape->id);
 	scale = nsvg__getAverageScale(attr->xform);
+	shape->paintOrder = attr->paintOrder;
 	shape->strokeWidth = attr->strokeWidth * scale;
 	shape->strokeDashOffset = attr->strokeDashOffset * scale;
 	shape->strokeDashCount = (char)attr->strokeDashCount;
@@ -1695,6 +1708,27 @@ static char nsvg__parseFillRule(const char* str)
 	return NSVG_FILLRULE_NONZERO;
 }
 
+static NSVGpaintOrder nsvg__parsePaintOrder(const char* str)
+{
+	// The order of these three keywords indicates the order in which the painting happens, from left to right.
+	// If any of the three painting components is omitted, they will be painted in their default order after the specified components.
+	// For example, using stroke is equivalent to stroke fill markers.
+
+	if (strcmp(str, "fill stroke markers") == 0 || strcmp(str, "fill stroke") == 0 || strcmp(str, "fill") == 0)
+		return NSVG_PAINT_ORDER_FILL_STROKE_MARKERS;
+	else if (strcmp(str, "stroke fill markers") == 0 || strcmp(str, "stroke fill") == 0 || strcmp(str, "stroke") == 0)
+		return NSVG_PAINT_ORDER_STROKE_FILL_MARKERS;
+	else if (strcmp(str, "fill markers stroke") == 0 || strcmp(str, "fill markers") == 0)
+		return NSVG_PAINT_ORDER_FILL_MARKERS_STROKE;
+	else if (strcmp(str, "markers fill stroke") == 0 || strcmp(str, "markers fill") == 0 || strcmp(str, "markers") == 0)
+		return NSVG_PAINT_ORDER_MARKERS_FILL_STROKE;
+	else if (strcmp(str, "stroke markers fill") == 0 || strcmp(str, "stroke markers") == 0)
+		return NSVG_PAINT_ORDER_STROKE_MARKERS_FILL;
+	else if (strcmp(str, "markers stroke fill") == 0 || strcmp(str, "markers stroke") == 0)
+		NSVG_PAINT_ORDER_MARKERS_STROKE_FILL;
+	return NSVG_PAINT_ORDER_FILL_STROKE_MARKERS;
+}
+
 static const char* nsvg__getNextDashItem(const char* s, char* it)
 {
 	int n = 0;
@@ -1798,6 +1832,8 @@ static int nsvg__parseAttr(NSVGparser* p, const char* name, const char* value)
 		attr->miterLimit = nsvg__parseMiterLimit(value);
 	} else if (strcmp(name, "fill-rule") == 0) {
 		attr->fillRule = nsvg__parseFillRule(value);
+	} else if (strcmp(name, "paint-order") == 0) {
+		attr->paintOrder = nsvg__parsePaintOrder(value);
 	} else if (strcmp(name, "font-size") == 0) {
 		attr->fontSize = nsvg__parseCoordinate(p, value, 0.0f, nsvg__actualLength(p));
 	} else if (strcmp(name, "transform") == 0) {
